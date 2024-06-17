@@ -1,0 +1,89 @@
+"Metodo que permite procesar clases de mensajes para entregas entrantes(siempre que sean mensajes que se procesen por transaccion propia de la aplicacion)
+"Se le debe de pasar la clas de mensaje y el medio de envio( pòr impresora, mail, EDI ) y el modo de tratamiento( Primer proceso, repeticion o errores ).
+
+methods PROCESS_MESSAGE_CLASS_ENT
+    importing
+      !IT_KSCHL type CPET_FA_KSCHL_TAB
+      !IT_NACHA type ZMSG_MEDIO_ENVIO
+      !IV_VERMO type NA_VERMO
+    returning
+      value(RT_RETURN) type BAPIRET2_T .
+
+METHOD process_message_class_ent.
+
+    DATA lr_nacha TYPE RANGE OF na_nacha.
+    DATA lr_kschl TYPE RANGE OF kschl.
+    DATA lr_objky TYPE RANGE OF objky.
+    DATA lr_kappl TYPE RANGE OF kappl.
+    DATA lv_message TYPE bapi_msg.
+    DATA lt_disp  TYPE STANDARD TABLE OF naliv2.
+    DATA ls_disp  TYPE naliv2.
+    DATA lt_msgs  TYPE STANDARD TABLE OF msg0.
+    DATA lv_tabix TYPE sy-tabix.
+
+    lr_nacha = VALUE #( FOR ls_nacha IN it_nacha ( sign = 'I' option = 'EQ' low = ls_nacha ) ).
+    lr_kschl = VALUE #( FOR ls_kschl IN it_kschl ( sign = 'I' option = 'EQ' low = ls_KSCHL ) ).
+    APPEND VALUE #( sign = 'I' option = 'EQ' low = me->_v_vbeln ) TO lr_objky.
+    APPEND VALUE #( sign = 'I' option = 'EQ' low = c_appl_msg_entrega ) TO lr_kappl.
+
+    DATA: lt_delivery   TYPE STANDARD TABLE OF bapishpdelivnumb,
+          lt_outputtype TYPE STANDARD TABLE OF bapioutptype,
+          lt_log        TYPE STANDARD TABLE OF bapimsgprot,
+          lt_return     TYPE bapiret2_t.
+
+    "Seleccionamos el mensaje pendiente de procesado de la entrega entrante
+    CALL FUNCTION 'WFMC_MESSAGES_SELECT'
+      EXPORTING
+        pi_application = 'E1'
+        pi_processing  = iv_vermo
+      TABLES
+        ri_medium      = lr_nacha
+        ri_type        = lr_kschl
+        ri_object      = lr_objky
+        tx_messages    = lt_msgs.
+
+    IF lt_msgs IS INITIAL.
+      MESSAGE e365(zsd1) INTO lv_message.
+      APPEND VALUE #( type = 'E' number = 365 id = 'ZSD1' message = lv_message ) TO rt_return.
+    ENDIF.
+
+    CHECK rt_return IS INITIAL.
+    CALL FUNCTION 'WFMC_MESSAGES_EXTEND'
+      TABLES
+        tx_messages = lt_msgs.
+
+    SELECT  vbeln, vstel, lfdat, wadat FROM likp
+    INTO TABLE @DATA(lt_apda)
+    FOR ALL ENTRIES IN @lt_msgs
+    WHERE vbeln     EQ @lt_msgs-objky(10).
+
+    LOOP AT lt_msgs ASSIGNING FIELD-SYMBOL(<fs_msgs>).
+      lv_tabix = sy-tabix.
+      ls_disp = CORRESPONDING #( <fs_msgs> ).
+      ls_disp-vbeln = <fs_msgs>-objky(10).
+      ls_disp-posnr = ls_disp-posnr.
+      DATA(ls_apda) = lt_apda[ 1 ].
+      ls_disp = CORRESPONDING #( ls_apda ).
+      <fs_msgs>-tabix = lv_tabix.
+      ls_disp-tabix = lv_tabix.
+      APPEND ls_disp TO lt_disp.
+    ENDLOOP.
+
+    CALL FUNCTION 'WFMC_MESSAGES_PROCESS'
+      EXPORTING
+        pi_display_id = 'NALIE1'
+        pi_no_dialog  = 'X'
+        pi_vermo      = iv_vermo
+      TABLES
+        tx_messages   = lt_msgs
+        tx_display    = lt_disp.
+
+    IF NOT line_exists( lt_msgs[ pcode = 'E' ] ).
+      MESSAGE s366(zsd1) INTO lv_message.
+      APPEND VALUE #( type = 'S' number = 366 id = 'ZSD1' message = lv_message ) TO lt_return.
+    ELSE.
+      MESSAGE e365(zsd1) INTO lv_message.
+      APPEND VALUE #( type = 'E' number = 365 id = 'ZSD1' message = lv_message ) TO lt_return.
+    ENDIF.
+
+  ENDMETHOD.
