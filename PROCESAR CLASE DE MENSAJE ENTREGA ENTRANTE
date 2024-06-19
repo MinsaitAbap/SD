@@ -1,6 +1,6 @@
 "Metodo que permite procesar clases de mensajes para entregas entrantes(siempre que sean mensajes que se procesen por transaccion propia de la aplicacion)
 "Se le debe de pasar la clas de mensaje y el medio de envio( pòr impresora, mail, EDI ) y el modo de tratamiento( Primer proceso, repeticion o errores ).
-
+"La funcion que procesa los mensajes NO RETORNA el texto del mensaje de error Y SOLO si hay un error.
 methods PROCESS_MESSAGE_CLASS_ENT
     importing
       !IT_KSCHL type CPET_FA_KSCHL_TAB
@@ -21,8 +21,10 @@ METHOD process_message_class_ent.
     DATA lt_msgs  TYPE STANDARD TABLE OF msg0.
     DATA lv_tabix TYPE sy-tabix.
 
+    "Informamos la la clase de mensaje y el tipo de envio a seleccionar
     lr_nacha = VALUE #( FOR ls_nacha IN it_nacha ( sign = 'I' option = 'EQ' low = ls_nacha ) ).
     lr_kschl = VALUE #( FOR ls_kschl IN it_kschl ( sign = 'I' option = 'EQ' low = ls_KSCHL ) ).
+    "informamos la entrega y la aplicacion a seleccionar
     APPEND VALUE #( sign = 'I' option = 'EQ' low = me->_v_vbeln ) TO lr_objky.
     APPEND VALUE #( sign = 'I' option = 'EQ' low = c_appl_msg_entrega ) TO lr_kappl.
 
@@ -48,6 +50,7 @@ METHOD process_message_class_ent.
     ENDIF.
 
     CHECK rt_return IS INITIAL.
+    "Estendemos los mensajes seleccionados
     CALL FUNCTION 'WFMC_MESSAGES_EXTEND'
       TABLES
         tx_messages = lt_msgs.
@@ -68,7 +71,7 @@ METHOD process_message_class_ent.
       ls_disp-tabix = lv_tabix.
       APPEND ls_disp TO lt_disp.
     ENDLOOP.
-
+    "procesamos la clase de mensajes seleccinados del tipo de entrega entrante(valor NALIE1)
     CALL FUNCTION 'WFMC_MESSAGES_PROCESS'
       EXPORTING
         pi_display_id = 'NALIE1'
@@ -77,13 +80,13 @@ METHOD process_message_class_ent.
       TABLES
         tx_messages   = lt_msgs
         tx_display    = lt_disp.
-
+    "El tipo de error se retorna en el campo pcode
     IF NOT line_exists( lt_msgs[ pcode = 'E' ] ).
       MESSAGE s366(zsd1) INTO lv_message.
-      APPEND VALUE #( type = 'S' number = 366 id = 'ZSD1' message = lv_message ) TO lt_return.
+      APPEND VALUE #( type = 'S' number = 366 id = 'ZSD1' message = lv_message ) TO rt_return.
     ELSE.
       MESSAGE e365(zsd1) INTO lv_message.
-      APPEND VALUE #( type = 'E' number = 365 id = 'ZSD1' message = lv_message ) TO lt_return.
+      APPEND VALUE #( type = 'E' number = 365 id = 'ZSD1' message = lv_message ) TO rt_return.
     ENDIF.
 
   ENDMETHOD.
