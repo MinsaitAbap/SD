@@ -1,0 +1,26 @@
+CLASS zcl_sd_entrega_exits DEFINITION
+  PUBLIc
+  inheriting from ZCL_EXITS
+
+  FINAL
+  CREATE PUBLIC .
+  PUBLIC SECTION.
+  CLASS-METHODS:
+  "!Enhancement en la BAPI BAPI_BILLINGDOC_CREATEMULTIPLE que utiliamos para recoger el pricing en función de una factura a partir de una entrega.
+  "! Utilizamos singleton zcl_singleton_entrega para guardar los datos en memoria y poderlos recoger desde la entrega
+  "! @parameter it_komv | condiciones que recogemos
+  st_enh_BAPI_BILLINGDC_CREATE
+   IMPORTING
+    it_komv TYPE tt_komv.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+CLASS zcl_sd_entrega_exits IMPLEMENTATION.
+  METHOD st_enh_BAPI_BILLINGDC_CREATE.
+    DATA(lo_singleton_entrega) = zcl_singleton_entrega=>st_get_instance( ).
+    lo_singleton_entrega->set_komv( it_komv = it_komv ).
+  ENDMETHOD.
+
+ENDCLASS.
