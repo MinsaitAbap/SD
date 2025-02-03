@@ -1,0 +1,53 @@
+CLASS zcl_singleton_entrega DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+
+    CLASS-METHODS:
+      "! Crear instancia del singleton
+      "! @parameter ro_instance | Instancia
+      st_get_instance
+        RETURNING VALUE(ro_instance) TYPE REF TO  zcl_singleton_entrega.
+    METHODS:
+    "! Obtener datos de condiciones (KOMV)
+    "! @parameter et_komv | Datos de condiciones
+      get_komv
+        EXPORTING
+          et_komv TYPE tt_komv,
+    "! Establecer datos de condiciones
+    "! @parameter it_komv | Datos de condiciones
+      set_komv
+        IMPORTING
+          it_komv TYPE tt_komv.
+
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+    CLASS-DATA: o_ref TYPE REF TO  zcl_singleton_entrega.
+    DATA: t_komv TYPE tt_komv.
+
+
+ENDCLASS.
+
+
+
+CLASS zcl_singleton_entrega IMPLEMENTATION.
+
+  METHOD st_get_instance.
+    IF o_ref IS INITIAL.
+      o_ref = NEW zcl_singleton_entrega(  ).
+    ENDIF.
+    ro_instance = o_ref.
+  ENDMETHOD.
+
+  METHOD get_komv.
+    et_komv = me->t_komv.
+  ENDMETHOD.
+
+  METHOD set_komv.
+    me->t_komv = it_komv.
+  ENDMETHOD.
+
+ENDCLASS.
